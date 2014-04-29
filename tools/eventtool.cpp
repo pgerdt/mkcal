@@ -42,17 +42,23 @@ void createNotebook()
 void createAllDayEvent()
 {
   qDebug() << "Adding all day event";
+  if (notebook.isNull())
+    createNotebook();
+
   auto event = KCalCore::Event::Ptr(new KCalCore::Event);
   QDate startDate(2014, 2, 1);
   event->setDtStart(KDateTime(startDate, QTime(), KDateTime::ClockTime));
   event->setAllDay(true);
   event->setSummary("test event with clock time");
   calendar->addEvent(event, NotebookId);
+  storage->save();
 }
 
 void createNormalEvents()
 {
   qDebug() << "Adding some hour long events";
+  if (notebook.isNull())
+    createNotebook();
 
   auto event = KCalCore::Event::Ptr(new KCalCore::Event);
   QDate startDate(2014, 2, 3);
@@ -72,6 +78,7 @@ void createNormalEvents()
   event->setDtEnd(KDateTime(startDate, QTime(21, 0), KDateTime::ClockTime));
   event->setSummary("test event with 20:00 clock time");
   calendar->addEvent(event, NotebookId);
+  storage->save();
 }
 
 void createRandomAllDay(QDate day)
@@ -102,6 +109,9 @@ void createRandomEvent(QDate day)
 
 void createHugeNotebook()
 {
+  if (notebook.isNull())
+    createNotebook();
+
   QDate current = QDate::currentDate().addYears(-2);
   QDate end = QDate::currentDate().addYears(2);
 
@@ -116,15 +126,40 @@ void createHugeNotebook()
       }
     }
   }
+  storage->save();
+}
+
+void listNotebooks()
+{
+  mKCal::Notebook::List notebooks = storage->notebooks();
+  qDebug() << "|Name|Uid|";
+  for (int i = 0; i < notebooks.count(); ++i) {
+    qDebug() << "|" << notebooks.at(i)->name() << "|"
+             << notebooks.at(i)->uid() << "|";
+  }
+}
+
+void deleteNotebook(const QString &uid)
+{
+  if (storage->isValidNotebook(uid)) {
+    if (storage->deleteNotebook(storage->notebook(uid)))
+      storage->save();
+    else
+      qDebug() << "Failed to delete notebook with uid: " << uid;
+  } else {
+    qDebug() << "Not a valid notebook uid: " << uid;
+  }
 }
 
 void printUsage()
 {
   qDebug() << "Usage:";
-  qDebug() << " --clear          -> clear test notebook";
-  qDebug() << " --all-day        -> create all day event on 2014/2/1";
-  qDebug() << " --normal-events  -> create some normal events on 2014/2/3";
-  qDebug() << " --create-huge    -> create huge notebook with random events +-2 years current time";
+  qDebug() << " --clear                 -> clear test notebook";
+  qDebug() << " --all-day               -> create all day event on 2014/2/1";
+  qDebug() << " --normal-events         -> create some normal events on 2014/2/3";
+  qDebug() << " --create-huge           -> create huge notebook with random events +-2 years current time";
+  qDebug() << " --list-notebooks        -> print a list of notebooks";
+  qDebug() << " --delete-notebook <uid> -> delete notebook identified by <uid>";
 }
 
 int main(int argc, char* argv[])
@@ -143,10 +178,6 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  if (notebook.isNull()) {
-    createNotebook();
-  }
-
   if (argc == 2) {
     QString argument(argv[1]);
 
@@ -156,6 +187,17 @@ int main(int argc, char* argv[])
       createNormalEvents();
     } else if (argument == "--create-huge") {
       createHugeNotebook();
+    } else if (argument == "--list-notebooks") {
+      listNotebooks();
+    } else {
+      printUsage();
+    }
+  } else if (argc == 3) {
+    QString argument(argv[1]);
+    QString parameter(argv[2]);
+
+    if (argument == "--delete-notebook") {
+      deleteNotebook(parameter);
     } else {
       printUsage();
     }
@@ -163,12 +205,9 @@ int main(int argc, char* argv[])
     printUsage();
   }
 
-  storage->save();
-
   notebook.clear();
   storage.clear();
   calendar.clear();
 
   return 0;
 }
-
